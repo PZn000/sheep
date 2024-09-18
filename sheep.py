@@ -155,10 +155,10 @@ def draw():
             draw_game_over()
         else:
             #倒计时
-            time_text = f"Time Left: {int(time_left)}"
-            screen.draw.text(time_text, center=(WIDTH // 2, 50), fontsize=36, color="red")
+            time_text = f"Time: {int(time_left)}"
+            screen.draw.text(time_text, center=(WIDTH//2 , 30), fontsize=100, color="yellow")
             #分数
             score_text = f"Score: {score}"
-            screen.draw.text(score_text, topleft=(10, 10), fontsize=30, color="white")
+            screen.draw.text(score_text, topright=(100, 500), fontsize=30, color="red")
 music.play('bgm') # 播放音乐
 pgzrun.go()
