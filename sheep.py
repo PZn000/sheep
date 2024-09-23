@@ -24,6 +24,7 @@ T_HEIGHT = 66
 GAME_STATE = 0
 TIME = 300
 SVAE_TIME = 300
+SCORE = 0
 TEXT = 'timeleft:' + str(int(TIME))
 # 下方牌堆的位置
 DOCK = Rect((90, 564), (T_WIDTH*7, T_HEIGHT))
@@ -66,6 +67,8 @@ for i in range(4):        #剩余的4张牌放下面（为了凑整能通关）
 def init():
     global docks
     global tiles
+    global SCORE
+    SCORE = 0
     docks = []
     tiles = []
     ts = list(range(1, 13)) * 12
@@ -94,7 +97,9 @@ def init():
 def draw_time():
     global TIME
     global TEXT
-    screen.draw.text(TEXT,(200,30),fontsize = 50,color = 'red')
+    screen.draw.text(TEXT,(330,30),fontsize = 50,color = 'red')
+def drow_score():
+    screen.draw.text('score:'+str(SCORE),(100,30),fontsize = 50, color = 'blue')
 def draw_menu():
     screen.clear()
     screen.fill((0,255,255))
@@ -107,22 +112,28 @@ def draw_diffculty():
     easy.draw()
     medium.draw()
     diffcult.draw()
-
+def draw_fail():
+    screen.clear()
+    screen.blit('fail',(0,0))
+    screen.draw.text('your score:' + str(SCORE),(200,550),fontsize = 50, color = 'blue')
+def draw_win():
+    screen.clear()
+    screen.blit('win',(0,0))
 def update():
     global TIME
     global TEXT
     global GAME_STATE
+    # 超过7张，失败
+    if len(docks) >= 7:
+        GAME_STATE = 3
+    # 没有剩牌，胜利
+    if len(tiles) == 0:
+        GAME_STATE = 4
     if TIME > 0 and GAME_STATE == 1:
         TIME -= 1/60
         TEXT = 'timeleft:' + str((int(TIME)))
     if GAME_STATE == 1 and TIME < 0:
         GAME_STATE = 3
-def draw_fail():
-    screen.clear()
-    screen.blit('fail',(0,0))
-def draw_win():
-    screen.clear()
-    screen.blit('win',(0,0))
 # 绘制函数
 def draw():
     global CURRENT_SCREEN
@@ -145,6 +156,7 @@ def draw():
         CURRENT_SCREEN = 1
         #背景图
         screen.blit('back', (0, 0))
+        drow_score()
         draw_time()
         for tile in tiles:
             #绘制上方牌组
@@ -157,22 +169,15 @@ def draw():
             tile.top = DOCK.y
             tile.draw()
 
-        # 超过7张，失败
-        if len(docks) >= 7:
-            init()
-            GAME_STATE = 3
-        # 没有剩牌，胜利
-        if len(tiles) == 0:
-            init()
-            GAME_STATE = 4
-
 def on_mouse_down(pos,button):
     global GAME_STATE
     global TIME
     global CURRENT_SCREEN
     global SVAE_TIME
+    global SCORE
     if GAME_STATE == 0 and CURRENT_SCREEN == 0:
         if begin.collidepoint(pos) :
+            init()
             GAME_STATE = 1
         if diffculty.collidepoint(pos):
             GAME_STATE = 2
@@ -192,17 +197,21 @@ def on_mouse_down(pos,button):
     if GAME_STATE == 3 and CURRENT_SCREEN == 3:
         x,y = pos
         if 180<x<430 and 350<y<420:
+            init()
             GAME_STATE = 1
             TIME = SVAE_TIME
         if 180<x<430 and 440<y<540:
+            init()
             GAME_STATE = 0
             TIME = SVAE_TIME
     if GAME_STATE == 4 and CURRENT_SCREEN == 4:
         x, y = pos
         if 180 < x < 430 and 350 < y < 420:
+            init()
             GAME_STATE = 1
             TIME = SVAE_TIME
         if 180 < x < 430 and 440 < y < 540:
+            init()
             GAME_STATE = 0
             TIME = SVAE_TIME
     if GAME_STATE == 1 and CURRENT_SCREEN == 1:
@@ -217,6 +226,7 @@ def on_mouse_down(pos,button):
                     docks.append(tile)
                 else:             #否则用不相同的牌替换牌堆（即消除相同的牌）
                     docks = diff
+                    SCORE += 100
                 for down in tiles:      #遍历所有的牌
                     if down.layer == tile.layer - 1 and down.colliderect(tile):   #如果在此牌的下一层，并且有重叠
                         for up in tiles:      #那就再反过来判断这种被覆盖的牌，是否还有其他牌覆盖它
