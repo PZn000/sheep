@@ -1,164 +1,230 @@
+# 获取教程、习题、案例，共同学习、讨论、打卡
+# 请关注：Crossin的编程教室
+# QQ群：725903636，微信：sunset24678
+# 代码使用 pygame-zero 框架，看起来与一般代码稍有不同，会有很多未定义的方法和变量，
+# 在一些编辑器里会报错，但其实是可以运行的，无需手动增加 import。
+# pgzero有两种方式运行（https://pygame-zero.readthedocs.io/zh_CN/latest/ide-mode.html）
+# 本代码用的是第二种直接运行的方式（需新版pgzero）。
+# 有部分读者反馈此代码在spyder上无法运行，类似情况可以尝试第一种传统方法：
+# 把最后的pgzrun.go()去掉，然后直接在命令行该目录下运行： pgzrun sheep.py
+import pgzero
 import pgzrun
 import pygame
 import random
+import math
 import os
+import time
+# 定义游戏相关属性
+TITLE = '动了个物'
+WIDTH = 600
+HEIGHT = 720
+# 自定义游戏常量
+T_WIDTH = 60
+T_HEIGHT = 66
+GAME_STATE = 0
+TIME = 300
+SVAE_TIME = 300
+TEXT = 'timeleft:' + str(int(TIME))
+# 下方牌堆的位置
+DOCK = Rect((90, 564), (T_WIDTH*7, T_HEIGHT))
+# 上方的所有牌
+tiles = []
+# 牌堆里的牌
+docks = []
+#界面对象
+begin = Actor(('begin'),(300,250))
+diffculty = Actor('diffculty',(300,450))
+easy = Actor('easy',(300,100))
+medium = Actor('medium',(300,300))
+diffcult = Actor('diffcult',(300,500))
+CURRENT_SCREEN = 0
+# 初始化牌组，12*12张牌随机打乱
+ts = list(range(1, 13))*12
+random.shuffle(ts)
+n = 0
+for k in range(7):    # 7层
+    for i in range(7-k):    #每层减1行
+        for j in range(7-k):
+            t = ts[n]        #获取排种类
+            n += 1
+            tile = Actor(f'a{t}')       #使用tileX图片创建Actor对象
+            tile.pos = 120 + (k * 0.5 + j) * tile.width, 100 + (k * 0.5 + i) * tile.height * 0.9    #设定位置
+            tile.tag = t            #记录种类
+            tile.layer = k          #记录层级
+            tile.status = 1 if k == 6 else 0        #除了最顶层，状态都设置为0（不可点）这里是个简化实现
+            tiles.append(tile)
+for i in range(4):        #剩余的4张牌放下面（为了凑整能通关）
+    t = ts[n]
+    n += 1
+    tile = Actor(f'a{t}')
+    tile.pos = 210 + i * tile.width, 516
+    tile.tag = t
+    tile.layer = 0
+    tile.status = 1
+    tiles.append(tile)
 
-from matplotlib import pyplot as plt
-
-
-name = '动了个物'
-game_started = game_failed = False #失败和开始标志
-countdown_time = 300 #游戏时间
-time_left = countdown_time
-tiles = [] #剩余的牌
-docks = [] #获得的牌
-score = 0
-T_WIDTH = 60 #牌的宽度
-T_HEIGHT = 66 #牌的高度
-DOCK = Rect((90, 564), (T_WIDTH * 7, T_HEIGHT)) #获得牌的位置
-high_scores = [] #存储分数
-WIDTH = 600 #界面宽度
-HEIGHT = 720 #界面高度
-class Tile(Actor):
-    def __init__(self, image, tag, pos, layer, status=0):
-        super().__init__(image)
-        self.tag = tag  #牌的标签
-        self.layer = layer  # 牌的层级
-        self.status = status  # 牌的状态
-        self.pos = pos  # 牌的位置
-
-def draw_start_screen():
-    global start_button_rect
-    screen.fill((0,0, 255))  # 背景色
-    start_image = pygame.image.load('images/start_screen.png') #背景图片
-    #设置开始图片的位置
-    image_width, image_height = start_image.get_size()
-    x = (WIDTH - image_width) // 2
-    y = (HEIGHT - image_height) // 2
-    screen.blit(start_image, (x, y))
-    start_button_rect = pygame.Rect(x, y, image_width, image_height)
-def on_mouse_down(pos):
-    global docks, game_started, game_failed, score
-    if not game_started:
-        if pygame.mouse.get_pressed()[0]:
-            if start_button_rect.collidepoint(pos):
-                game_started = True
-                initialize_game()
-        return
-    if len(docks) >= 7 or len(tiles) == 0 or game_failed:
-        if pygame.mouse.get_pressed()[0]:
-            if restart_button_rect.collidepoint(pos):
-                initialize_game()
-                return
-    for tile in reversed(tiles):
-        if tile.status == 1 and tile.collidepoint(pos):
-            tile.status = 2
-            tiles.remove(tile)
-            diff = [t for t in docks if t.tag != tile.tag]
-            if len(docks) - len(diff) < 2:
-                docks.append(tile)
-            else:
-                docks = diff
-                score += 100  #增加分数
-            for down in tiles:
-                if down.layer == tile.layer - 1 and down.colliderect(tile):
-                    for up in tiles:
-                        if up.layer == down.layer + 1 and up.colliderect(down):
-                            break
-                    else:
-                        down.status = 1
-            return
-def load_high_scores(): # 加载成绩
-    global high_scores
-    if os.path.exists('high_scores.txt'):
-        with open('high_scores.txt', 'r') as file:
-            high_scores = [int(line.strip()) for line in file.readlines()]
-    else:
-        high_scores = []
-def save_high_scores(): #保存成绩
-    with open('high_scores.txt', 'w') as file:
-        for score in high_scores:
-            file.write(f"{score}\n")
-def update_high_scores(new_score): #更新成绩
-    global high_scores
-    high_scores.append(new_score)
-    high_scores = sorted(high_scores, reverse=True)[:5]  # 只保存前5名
-
-def update():
-    global time_left, game_failed
-    if game_started and not game_failed:
-        time_left -= 1 / 60
-        if time_left <= 0:
-            time_left = 0
-            game_failed = True
-load_high_scores()
-def draw_game_over(): #游戏结束
-    global score
-    update_high_scores(score)  # 更新排行榜
-    save_high_scores()
-   # 绘制排行榜
-    screen.draw.text("over", center=(WIDTH // 2, HEIGHT // 2), fontsize=50, color="red")
-    screen.draw.text("scores:", center=(WIDTH // 2, HEIGHT // 2 + 50), fontsize=40, color="blue")
-    for i, hs in enumerate(high_scores):
-        screen.draw.text(f"{i + 1}. {hs}", center=(WIDTH // 2, HEIGHT // 2 + 100 + i * 30), fontsize=30, color="white")
-    global restart_button_rect
-    restart_button_image = pygame.image.load('images/restart.png')
-    restart_button_width, restart_button_height = restart_button_image.get_size()
-    restart_button_x = (WIDTH - restart_button_width) // 2
-    restart_button_y = 20  # 将按钮放在窗口上方
-    screen.blit(restart_button_image, (restart_button_x, restart_button_y))
-    restart_button_rect = pygame.Rect(restart_button_x, restart_button_y, restart_button_width, restart_button_height)
-def initialize_game(): #初始化
-    global tiles, docks, game_failed, time_left, score
-    tiles.clear()
-    docks.clear()
-    game_failed = False
-    time_left = countdown_time
-    score = 0
+def init():
+    global docks
+    global tiles
+    docks = []
+    tiles = []
     ts = list(range(1, 13)) * 12
     random.shuffle(ts)
     n = 0
-    for k in range(7):
-        for i in range(7 - k):
+    for k in range(7):  # 7层
+        for i in range(7 - k):  # 每层减1行
             for j in range(7 - k):
-                t = ts[n]
+                t = ts[n]  # 获取排种类
                 n += 1
-                tile = Tile(f'a{t}', t, (120 + (k * 0.5 + j) * T_WIDTH, 100 + (k * 0.5 + i) * T_HEIGHT * 0.9), k,
-                            1 if k == 6 else 0)
+                tile = Actor(f'a{t}')  # 使用tileX图片创建Actor对象
+                tile.pos = 120 + (k * 0.5 + j) * tile.width, 100 + (k * 0.5 + i) * tile.height * 0.9  # 设定位置
+                tile.tag = t  # 记录种类
+                tile.layer = k  # 记录层级
+                tile.status = 1 if k == 6 else 0  # 除了最顶层，状态都设置为0（不可点）这里是个简化实现
                 tiles.append(tile)
-    for i in range(4):
+    for i in range(4):  # 剩余的4张牌放下面（为了凑整能通关）
         t = ts[n]
         n += 1
-        tile = Tile(f'a{t}', t, (210 + i * T_WIDTH, 516), 0, 1)
+        tile = Actor(f'a{t}')
+        tile.pos = 210 + i * tile.width, 516
+        tile.tag = t
+        tile.layer = 0
+        tile.status = 1
         tiles.append(tile)
+def draw_time():
+    global TIME
+    global TEXT
+    screen.draw.text(TEXT,(200,30),fontsize = 50,color = 'red')
+def draw_menu():
+    screen.clear()
+    screen.fill((0,255,255))
+    screen.draw.text("animals",(160,100),fontsize = 100)
+    begin.draw()
+    diffculty.draw()
+def draw_diffculty():
+    screen.clear()
+    screen.fill((0,255,255))
+    easy.draw()
+    medium.draw()
+    diffcult.draw()
+
+def update():
+    global TIME
+    global TEXT
+    global GAME_STATE
+    if TIME > 0 and GAME_STATE == 1:
+        TIME -= 1/60
+        TEXT = 'timeleft:' + str((int(TIME)))
+    if GAME_STATE == 1 and TIME < 0:
+        GAME_STATE = 3
+def draw_fail():
+    screen.clear()
+    screen.blit('fail',(0,0))
+def draw_win():
+    screen.clear()
+    screen.blit('win',(0,0))
+# 绘制函数
 def draw():
-    if not game_started:
-        draw_start_screen()
-    else:
-        screen.clear()
-        screen.blit('back.png', (0, 0))  # 背景图
+    global CURRENT_SCREEN
+    global TIME
+    global GAME_STATE
+    global docks
+    if GAME_STATE == 3:
+        draw_fail()
+        CURRENT_SCREEN = 3
+    if GAME_STATE == 0:
+        draw_menu()
+        CURRENT_SCREEN = 0
+    if GAME_STATE == 2:
+        draw_diffculty()
+        CURRENT_SCREEN = 2
+    if GAME_STATE == 4:
+        draw_win()
+        CURRENT_SCREEN =4
+    if GAME_STATE == 1:
+        CURRENT_SCREEN = 1
+        #背景图
+        screen.blit('back', (0, 0))
+        draw_time()
         for tile in tiles:
+            #绘制上方牌组
             tile.draw()
             if tile.status == 0:
-                screen.blit('mask.png', tile.topleft)
+                screen.blit('mask', tile.topleft)     #不可点的添加遮罩
         for i, tile in enumerate(docks):
+            #绘制排队，先调整一下位置（因为可能有牌被消掉）
             tile.left = (DOCK.x + i * T_WIDTH)
             tile.top = DOCK.y
             tile.draw()
-            #失败
+
+        # 超过7张，失败
         if len(docks) >= 7:
-            draw_game_over()
-        elif len(tiles) == 0:
-            screen.blit('win.png', (0, 0))
-            draw_game_over()
-        elif game_failed:
-            draw_game_over()
-        else:
-            #倒计时
-            time_text = f"Time: {int(time_left)}"
-            screen.draw.text(time_text, center=(WIDTH//2 , 30), fontsize=100, color="yellow")
-            #分数
-            score_text = f"Score: {score}"
-            screen.draw.text(score_text, topright=(100, 500), fontsize=30, color="red")
-music.play('bgm') # 播放音乐
+            init()
+            GAME_STATE = 3
+        # 没有剩牌，胜利
+        if len(tiles) == 0:
+            init()
+            GAME_STATE = 4
+
+def on_mouse_down(pos,button):
+    global GAME_STATE
+    global TIME
+    global CURRENT_SCREEN
+    global SVAE_TIME
+    if GAME_STATE == 0 and CURRENT_SCREEN == 0:
+        if begin.collidepoint(pos) :
+            GAME_STATE = 1
+        if diffculty.collidepoint(pos):
+            GAME_STATE = 2
+    if GAME_STATE == 2 and CURRENT_SCREEN == 2:
+        if easy.collidepoint(pos) :
+            TIME = 300
+            SVAE_TIME =300
+            GAME_STATE = 0
+        if medium.collidepoint(pos):
+            TIME = 240
+            SVAE_TIME = 240
+            GAME_STATE = 0
+        if diffcult.collidepoint(pos):
+            TIME = 180
+            SVAE_TIME = 180
+            GAME_STATE = 0
+    if GAME_STATE == 3 and CURRENT_SCREEN == 3:
+        x,y = pos
+        if 180<x<430 and 350<y<420:
+            GAME_STATE = 1
+            TIME = SVAE_TIME
+        if 180<x<430 and 440<y<540:
+            GAME_STATE = 0
+            TIME = SVAE_TIME
+    if GAME_STATE == 4 and CURRENT_SCREEN == 4:
+        x, y = pos
+        if 180 < x < 430 and 350 < y < 420:
+            GAME_STATE = 1
+            TIME = SVAE_TIME
+        if 180 < x < 430 and 440 < y < 540:
+            GAME_STATE = 0
+            TIME = SVAE_TIME
+    if GAME_STATE == 1 and CURRENT_SCREEN == 1:
+        global docks
+        for tile in reversed(tiles):    #逆序循环是为了先判断上方的牌，如果点击了就直接跳出，避免重复判定
+            if tile.status == 1 and tile.collidepoint(pos):
+                # 状态1可点，并且鼠标在范围内
+                tile.status = 2
+                tiles.remove(tile)
+                diff = [t for t in docks if t.tag != tile.tag]    #获取牌堆内不相同的牌
+                if len(docks) - len(diff) < 2:    #如果相同的牌数量<2，就加进牌堆
+                    docks.append(tile)
+                else:             #否则用不相同的牌替换牌堆（即消除相同的牌）
+                    docks = diff
+                for down in tiles:      #遍历所有的牌
+                    if down.layer == tile.layer - 1 and down.colliderect(tile):   #如果在此牌的下一层，并且有重叠
+                        for up in tiles:      #那就再反过来判断这种被覆盖的牌，是否还有其他牌覆盖它
+                            if up.layer == down.layer + 1 and up.colliderect(down):     #如果有就跳出
+                                break
+                        else:      #如果全都没有，说明它变成了可点状态
+                            down.status = 1
+                return
+music.play('bgm')
+
 pgzrun.go()
